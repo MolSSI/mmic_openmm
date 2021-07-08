@@ -2,7 +2,6 @@ from typing import Dict, Any, Optional
 from mmic_translator.models.base import ToolkitModel
 from mmelemental.models import Molecule
 from mmelemental.types import Array
-from simtk.openmm import app
 import numpy
 from pydantic import Field
 from pathlib import Path
@@ -11,7 +10,28 @@ from pathlib import Path
 from mmic_openmm.components.mol_component import OpenMMToMolComponent
 from mmic_openmm.components.mol_component import MolToOpenMMComponent
 
+# OpenMM library
+from simtk.unit.quantity import Quantity
+from simtk.unit.unit import Unit, BaseUnit, BaseDimension
+from simtk.openmm.vec3 import Vec3
+from simtk.openmm import app
+
 __all__ = ["OpenMMMol"]
+
+
+class OpenMMUnit(Unit):
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v):
+        try:
+            v.get_name()
+            v.get_symbol()
+        except AttributeError as e:
+            raise AttributeError(f"{v} is not a valid OpenMM Unit object: {e}")
+        return v
 
 
 class OpenMMMol(ToolkitModel):
@@ -19,9 +39,12 @@ class OpenMMMol(ToolkitModel):
 
     positions: Array[float] = Field(
         ...,
-        description="Particle (e.g. atomic) positions numpy array of length natomsx3.",
+        description="Particle (e.g. atomic) positions numpy array of length (natoms*3,).",
     )
-    positions_units: str = Field(..., description="Unit for positions e.g. nanometer.")
+    positions_units: OpenMMUnit = Field(
+        ...,
+        description="Unit object for positions e.g. Unit(base_dim=BaseDimension('length'), name='nanometer', symbol='nm')",
+    )
 
     @property
     def dtype(self):
@@ -57,9 +80,12 @@ class OpenMMMol(ToolkitModel):
         """
 
         ext = Path(filename).suffix
+        top = None
 
+        # Add support for PSF files
         if ext == ".pdb":
             fileobj = app.PDBFile(filename, **kwargs)
+            top = fileobj.topology
         elif ext == ".gro":
             fileobj = app.GromacsGroFile(filename, **kwargs)
             if top_filename:
@@ -80,16 +106,20 @@ class OpenMMMol(ToolkitModel):
 
         if top is None:
             top = app.topology.Topology()
-            top._numAtoms = len(fileobj.atomNames)
+            top._numAtoms = (
+                len(fileobj.atomNames)
+                if hasattr(fileobj, "atomNames")
+                else len(fileobj.positions)
+            )
 
         positions = numpy.array(
             [(pos.x, pos.y, pos.z) for pos in fileobj.positions]
-        ).T.flatten()
+        ).flatten()
 
         return cls(
             data=top,
             positions=positions,
-            positions_units=fileobj.positions.unit.get_name(),
+            positions_units=fileobj.positions.unit,
         )
 
     @classmethod
@@ -129,18 +159,27 @@ class OpenMMMol(ToolkitModel):
         **kwargs
             Additional kwargs to pass to the constructors. kwargs takes precedence over  data.
         """
-        if dtype:
-            kwargs["format"] = kwargs.get("format", dtype)
-        if mode == "w":
-            kwargs["overwrite"] = True
-        elif mode == "a":
-            kwargs["overwrite"] = False
+        if dtype is None:
+            ext = Path(filename).suffix
+        else:
+            ext = "." + dtype
+
+        positions = Quantity(
+            [
+                Vec3(x=x, y=y, z=z)
+                for x, y, z in self.positions.reshape(self.data._numAtoms, 3)
+            ],
+            unit=self.positions_units,
+        )  # assume dim=3 always
+
+        if ext == ".pdb":
+            writeFile = app.PDBFile.writeFile
         else:
             raise NotImplementedError(
-                "File write mode can be either 'w' (write) or 'a' (append) for now."
+                "mmic_openmm ssupports writing only PDB files for now."
             )
 
-        self.data.save(filename, **kwargs)
+        writeFile(self.data, positions, open(filename, mode=mode), **kwargs)
 
     def to_schema(self, version: Optional[int] = 0, **kwargs) -> Molecule:
         """Converts the molecule to MMSchema molecule.
