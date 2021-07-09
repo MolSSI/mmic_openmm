@@ -5,14 +5,22 @@ from mmic_translator import (
     TransComponent,
     TransInput,
     TransOutput,
+    __version__,
 )
 from simtk.openmm import app
+import numpy
+
+provenance_stamp = {
+    "creator": "mmic_openmm",
+    "version": __version__,
+    "routine": __name__,
+}
 
 __all__ = ["MolToOpenMMComponent", "OpenMMToMolComponent"]
 
 
 class MolToOpenMMComponent(TransComponent):
-    """A component for converting Molecule to ParmEd molecule object."""
+    """A component for converting MMSchema to OpenMM Molecule."""
 
     def execute(
         self,
@@ -112,11 +120,13 @@ class MolToOpenMMComponent(TransComponent):
         return True, TransOutput(
             proc_input=inputs,
             data_object=omol,
+            success=True,
+            provenance=provenance_stamp,
         )
 
 
 class OpenMMToMolComponent(TransComponent):
-    """A component for converting ParmEd molecule to Molecule object."""
+    """A component for converting OpenMM to MMSchema Molecule object."""
 
     def execute(
         self,
@@ -130,37 +140,33 @@ class OpenMMToMolComponent(TransComponent):
         if isinstance(inputs, dict):
             inputs = self.input()(**inputs)
 
-        # I think parmed.Structure does not store forces
-        pmol = inputs.data_object
-        geo_units, vel_units = None, None
+        top = inputs.data_object
+        geo = inputs.keywords.get("positions", None)
+        if geo is not None:
+            geo_units = inputs.keywords.get("positions_units", geo.unit.get_name())
 
-        geo = TransComponent.get(pmol, "coordinates")
-        if geo is not None:  # General enough? hackish?
-            geo = geo.flatten()
-            geo_units = pmol.positions.unit.get_name()
+            geo = numpy.array([(pos.x, pos.y, pos.z) for pos in geo]).T.flatten()
 
-        vel = TransComponent.get(pmol, "velocities")
-        if vel is not None:
-            vel = vel.flatten()
-            vel_units = "angstrom/picosecond"  # hard-coded in ParmEd
+        atomic_data = [
+            (atom.name, atom.element.atomic_number, atom.element.symbol)
+            for atom in top.atoms()
+        ]
+        names, atomic_nums, element_names = zip(*atomic_data)
 
-        atomic_nums = [atom.atomic_number for atom in pmol.atoms]
-        names = [atom.name for atom in pmol.atoms]
-        element_names = [atom.element_name for atom in pmol.atoms]
-
-        masses = [atom.mass for atom in pmol.atoms]
-        masses_units = pmol.atoms[0].umass.unit.get_name()
+        try:
+            masses = [atom.element.mass._value for atom in top.atoms()]
+            masses_units = next(top.atoms()).element.mass.unit.get_name()
+        except Exception:
+            masses = None
+            masses_units = "dalton"
 
         # If bond order is none, set it to 1.
-        if hasattr(pmol, "bonds"):
-            connectivity = [
-                (bond.atom1.idx, bond.atom2.idx, bond.order or 1) for bond in pmol.bonds
-            ]
-        else:
-            connectivity = None
+        connectivity = [
+            (bond.atom1.index, bond.atom2.index, bond.order or 1)
+            for bond in top.bonds()
+        ]
 
-        if hasattr(pmol, "residues"):
-            residues = [(atom.residue.name, atom.residue.idx) for atom in pmol.atoms]
+        residues = [(atom.residue.name, atom.residue.index) for atom in top.atoms()]
 
         input_dict = {
             "atomic_numbers": atomic_nums,
@@ -168,8 +174,6 @@ class OpenMMToMolComponent(TransComponent):
             "atom_labels": names,
             "geometry": geo,
             "geometry_units": geo_units,
-            "velocities": vel,
-            "velocities_units": vel_units,
             "substructs": residues,
             "connectivity": connectivity,
             "masses": masses,
@@ -177,7 +181,10 @@ class OpenMMToMolComponent(TransComponent):
         }
 
         return True, TransOutput(
-            proc_input=inputs, schema_object=Molecule(**input_dict)
+            proc_input=inputs,
+            schema_object=Molecule(**input_dict),
+            success=True,
+            provenance=provenance_stamp,
         )
 
 
