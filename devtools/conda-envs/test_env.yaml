@@ -2,7 +2,7 @@ name: test
 channels:
 
   - defaults
-  - bioconda
+  - omnia
 dependencies:
     # Base depends
   - python
@@ -12,7 +12,7 @@ dependencies:
   - pytest
   - pytest-cov
   - codecov
-  - gromacs
+  - openmm
 
     # Pip-only installs
   - pip:
