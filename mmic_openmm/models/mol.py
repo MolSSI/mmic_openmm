@@ -15,6 +15,7 @@ from simtk.unit.quantity import Quantity
 from simtk.unit.unit import Unit, BaseUnit, BaseDimension
 from simtk.openmm.vec3 import Vec3
 from simtk.openmm import app
+from simtk.openmm import __version__ as openmm_version
 
 __all__ = ["OpenMMMol"]
 
@@ -46,8 +47,12 @@ class OpenMMMol(ToolkitModel):
         description="Unit object for positions e.g. Unit(base_dim=BaseDimension('length'), name='nanometer', symbol='nm')",
     )
 
-    @property
-    def dtype(self):
+    @classmethod
+    def engine(cls):
+        return "openmm", openmm_version
+
+    @classmethod
+    def dtype(cls):
         """Returns the fundamental molecule object type."""
         return app.topology.Topology
 
