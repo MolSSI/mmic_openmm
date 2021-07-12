@@ -5,12 +5,12 @@
 
 OpenMM translator for MMSchema
 ==============================
-This is part of the [MolSSI](http://molssi.org) Molecular Mechanics Interoperable Components ([MMIC](https://github.com/MolSSI/mmic)) project. This package provides translators between MMSchema and [OpenMM](https://github.com/openmm/openmm).
+This is part of the [MolSSI](http://molssi.org) Molecular Mechanics Interoperable Components ([MMIC](https://github.com/MolSSI/mmic)) project. This package provides translators between [MMSchema](https://molssi.github.io/mmschema) and [OpenMM](https://github.com/openmm/openmm).
 
 ![image](mmic_openmm/data/imgs/component.png)
 
 # API
-**mmic_openmm** provides 4 classes of translators for: molecules (topology) and forcefields.
+**mmic_openmm** provides 3 classes of translators for: molecules (topology), trajectories, and forcefields.
 
 ## Models
 ```python
