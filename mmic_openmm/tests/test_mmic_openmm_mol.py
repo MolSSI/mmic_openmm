@@ -54,7 +54,7 @@ def test_mol_to_openmm(**kwargs):
 
 def test_io_methods(**kwargs):
     omol = mmic_openmm.models.OpenMMMol.from_file(pdbfile, topfile)
-    assert isinstance(omol.data, omol.dtype)
+    assert isinstance(omol.data, omol.dtype())
 
     omol.to_file("tmp.pdb")
     os.remove("tmp.pdb")
