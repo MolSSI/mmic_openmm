@@ -1,51 +1,62 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union, List
 from mmic_translator.models.base import ToolkitModel
 from mmelemental.models.forcefield.mm_ff import ForceField
-import parmed
 
-from mmic_openmm.components.ff_component import FFToParmedComponent
-from mmic_openmm.components.ff_component import ParmedToFFComponent
+# Import Components
+from mmic_openmm.components.ff_component import FFToOpenMMComponent
+from mmic_openmm.components.ff_component import OpenMMToFFComponent
 
+# OpenMM library
+from simtk.unit.quantity import Quantity
+from simtk.unit.unit import Unit, BaseUnit, BaseDimension
+from simtk.openmm.vec3 import Vec3
+from simtk.openmm import app
+from simtk.openmm import __version__ as openmm_version
+from simtk.openmm.app import ForceField as OpenMMForceField
 
 __all__ = ["OpenMMFF"]
 
 
 class OpenMMFF(ToolkitModel):
-    """A model for ParmEd.Universe storing an MM molecule."""
+    """A model for storing a ForceField object in OpenMM."""
 
-    @property
-    def dtype(self):
+    @classmethod
+    def engine(cls):
+        return "openmm", openmm_version
+
+    @classmethod
+    def dtype(cls):
         """Returns the fundamental molecule object type."""
-        return parmed.structure.Structure
+        return OpenMMForceField
 
     @classmethod
     def isvalid(cls, data):
         """Makes sure the Structure object stores atoms."""
-        if hasattr(data, "atoms"):
-            if len(data.atoms):
+        if hasattr(data, "createSystem"):
+            if callable(data.createSystem):
                 return data
-        raise ValueError("ParmEd forcefield object does not contain any atoms!")
+        raise ValueError("OpenMM Forcefield object is invalid. Cannot create a system!")
 
     @classmethod
-    def from_file(cls, filename: str, **kwargs) -> "ParmedFF":
+    def from_file(cls, filename: Union[str, List[str]], **kwargs) -> "OpenMMFF":
         """
         Constructs an ParmedFF object from file(s).
 
         Parameters
         ----------
-        filename : str
-            The forcefield filename to read
+        filename : str or List[str]
+            The forcefield filename(s) to read
         **kwargs
             Any additional keywords to pass to the constructor
         Returns
         -------
-        ParmedFF
-            A constructed ParmedFF object.
+        OpenMMFF
+            A constructed OpenMMFF object.
         """
-        kwargs.pop(
-            "dtype", None
-        )  # load_file doesn't seem to support specifying file formats
-        ff = parmed.load_file(filename=filename, **kwargs)
+        if isinstance(filename, str):
+            ff = OpenMMForceField(filename, **kwargs)
+        else:
+            ff = OpenMMForceField(*filename, **kwargs)
 
         return cls(data=ff)
 
@@ -65,14 +76,14 @@ class OpenMMFF(ToolkitModel):
             Additional kwargs to pass to the constructors.
         Returns
         -------
-        ParmedFF
-            A constructed ParmedFF object.
+        OpenMMFF
+            A constructed OpenMMFF object.
         """
         inputs = {
             "schema_object": data,
             "schema_version": version or data.schema_version,
         }
-        out = FFToParmedComponent.compute(inputs)
+        out = FFToOpenMMComponent.compute(inputs)
         return cls(data=out.data_object, units=out.data_units)
 
     def to_file(self, filename: str, dtype: str = None, **kwargs):
