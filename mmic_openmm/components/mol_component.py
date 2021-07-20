@@ -122,6 +122,8 @@ class MolToOpenMMComponent(TransComponent):
             data_object=omol,
             success=True,
             provenance=provenance_stamp,
+            schema_version=inputs.schema_version,
+            schema_name=inputs.schema_name,
         )
 
 
@@ -185,6 +187,8 @@ class OpenMMToMolComponent(TransComponent):
             schema_object=Molecule(**input_dict),
             success=True,
             provenance=provenance_stamp,
+            schema_version=inputs.schema_version,
+            schema_name=inputs.schema_name,
         )
 
 
