@@ -32,7 +32,12 @@ def test_mmic_to_mol_from_pdb(**kwargs):
     struct = PDBFile(pdbfile)
     kwargs.setdefault("positions", struct.positions)
     kwargs.setdefault("positions_units", struct.positions.unit.get_name())
-    inputs = {"data_object": struct.topology, "keywords": kwargs}
+    inputs = {
+        "data_object": struct.topology,
+        "keywords": kwargs,
+        "schema_version": 1,
+        "schema_name": "my_schema",
+    }
 
     return mmic_openmm.components.OpenMMToMolComponent.compute(inputs)
 
@@ -42,13 +47,23 @@ def test_mmic_to_mol_from_gro(**kwargs):
     gro = GromacsTopFile(topfile)
     kwargs.setdefault("positions", struct.positions)
     kwargs.setdefault("positions_units", struct.positions.unit.get_name())
-    inputs = {"data_object": gro.topology, "keywords": kwargs}
+    inputs = {
+        "data_object": gro.topology,
+        "keywords": kwargs,
+        "schema_version": 1,
+        "schema_name": "my_schema",
+    }
     return mmic_openmm.components.OpenMMToMolComponent.compute(inputs)
 
 
 def test_mol_to_openmm(**kwargs):
     mmol = mm.models.molecule.mm_mol.Molecule.from_file(grofile, topfile)
-    inputs = {"schema_object": mmol, "keywords": kwargs}
+    inputs = {
+        "schema_object": mmol,
+        "schema_version": 1,
+        "schema_name": "my_schema",
+        "keywords": kwargs,
+    }
     return mmic_openmm.components.MolToOpenMMComponent.compute(inputs)
 
 
