@@ -1,6 +1,6 @@
 from typing import Dict, Any, Optional, Union, List
-from mmic_translator.models.base import ToolkitModel
-from mmelemental.models.forcefield.mm_ff import ForceField
+from mmic_translator.models import ToolkitModel, schema_input_default
+from mmelemental.models.forcefield import ForceField
 
 # Import Components
 from mmic_openmm.components.ff_component import FFToOpenMMComponent
@@ -40,7 +40,7 @@ class OpenMMFF(ToolkitModel):
     @classmethod
     def from_file(cls, filename: Union[str, List[str]], **kwargs) -> "OpenMMFF":
         """
-        Constructs an ParmedFF object from file(s).
+        Constructs an OpenMMFF object from file(s).
 
         Parameters
         ----------
@@ -82,6 +82,8 @@ class OpenMMFF(ToolkitModel):
         inputs = {
             "schema_object": data,
             "schema_version": version or data.schema_version,
+            "schema_name": schema_input_default,
+            "keywords": kwargs,
         }
         out = FFToOpenMMComponent.compute(inputs)
         return cls(data=out.data_object, units=out.data_units)
@@ -110,8 +112,13 @@ class OpenMMFF(ToolkitModel):
         **kwargs
             Additional kwargs to pass to the constructor.
         """
-        inputs = {"data_object": self.data, "schema_version": version, "kwargs": kwargs}
-        out = ParmedToFFComponent.compute(inputs)
+        inputs = {
+            "data_object": self.data,
+            "schema_version": version,
+            "schema_name": schema_input_default,
+            "keywords": kwargs,
+        }
+        out = OpenMMToFFComponent.compute(inputs)
         if version:
             assert version == out.schema_version
         return out.schema_object
