@@ -1,4 +1,4 @@
-name: Format
+name: format
 
 on:
   # GitHub has started calling new repo's first branch "main" https://github.com/github/renaming
@@ -6,11 +6,9 @@ on:
   # Both are tracked here to keep legacy and new codes working
   push:
     branches:
-      - "master"
       - "main"
   pull_request:
     branches:
-      - "master"
       - "main"
   schedule:
     # Nightly tests run on master by default:
@@ -25,7 +23,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: [3.8]
+        python-version: [3.9]
 
     steps:
     - uses: actions/checkout@v1
