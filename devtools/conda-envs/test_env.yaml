@@ -7,15 +7,13 @@ dependencies:
     # Base depends
   - python
   - pip
-
-    # Testing
-  - pytest
-  - pytest-cov
-  - codecov
   - openmm
 
     # Pip-only installs
   - pip:
+    - codecov
+    - pytest
+    - pytest-cov
     - qcelemental
     - git+https://github.com/parmed/parmed.git
     - git+https://github.com/MolSSI/mmic.git
