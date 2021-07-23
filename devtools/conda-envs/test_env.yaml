@@ -9,6 +9,7 @@ dependencies:
   - pip
   - openmm
   - cython
+  - libgcc-ng
 
     # Pip-only installs
   - pip:
