@@ -1,8 +1,9 @@
 name: test
 channels:
 
-  - defaults
+  - anaconda
   - omnia
+  - conda-forge
 dependencies:
     # Base depends
   - python
