@@ -1,9 +1,10 @@
 from mmelemental.models import forcefield
-from mmic_translator.models.io import (
+from mmic_translator.models import (
     TransInput,
     TransOutput,
 )
 from mmic_translator.components import TransComponent
+from mmic_openmm.mmic_openmm import units as openmm_units
 from typing import List, Tuple, Optional
 from collections.abc import Iterable
 from mmelemental.util.units import convert
@@ -302,14 +303,8 @@ class OpenMMToFFComponent(TransComponent):
         masses_units = atoms["0"].element.mass.unit.get_name()
         masses = convert(masses, masses_units, mm_units["masses_units"])
 
-        # Non-bonded params
-        nb_params = self._get_nonbonded(nonbond_ff)
-
-        lj = forcefield.nonbonded.potentials.LennardJones(
-            sigma=nb_params["sigma"], epsilon=nb_params["epsilon"]
-        )
-        # Need to include sigma_14 and epsilon_14
-        nonbonded = forcefield.nonbonded.NonBonded(params=lj, form="LennardJones")
+        nonbonded, charges = self._get_nonbonded(nonbond_ff)
+        bonds = self._get_bonds(bond_ff)
 
         # charge_groups = None ... should support charge_groups?
         exclusions = None
@@ -317,8 +312,8 @@ class OpenMMToFFComponent(TransComponent):
 
         input_dict = {
             "masses": masses,
-            "charges": nb_params["charge"],
-            # "bonds": bonds,
+            "charges": charges,
+            "bonds": bonds,
             # "angles": angles,
             # "dihedrals": dihedrals,
             "nonbonded": nonbonded,
@@ -340,68 +335,61 @@ class OpenMMToFFComponent(TransComponent):
             schema_name=inputs.schema_name,
         )
 
-    def _get_nonbonded(self, ff):
-        lj_scale = ff.lj14scale
-        coul_scale = ff.coulomb14scale
+    def _get_nonbonded(self, nonbond):
+        lj_scale = nonbond.lj14scale
+        coul_scale = nonbond.coulomb14scale
 
         params = {}
         # How to deal with lj/coul 1-4 scale? relevant to sigma/epsilon scale in parmed?
 
-        for paramName in ff.params.paramNames:
+        for paramName in nonbond.params.paramNames:
             params[paramName] = [
-                ff.params.paramsForType[str(i)][paramName]
-                for i in range(len(ff.params.paramsForType))
+                nonbond.params.paramsForType[str(i)][paramName]
+                for i in range(len(nonbond.params.paramsForType))
             ]
+
+        lj = forcefield.nonbonded.potentials.LennardJones(
+            sigma=params["sigma"], epsilon=params["epsilon"]
+        )
+
+        # Need to include sigma_14 and epsilon_14
+        nonbonded = forcefield.nonbonded.NonBonded(params=lj, form="LennardJones")
 
         # How do we access units?
-        return params
+        return nonbonded, params["charge"]
 
-    def _get_bonded(self):
-        if bond:
-            bonds_units = (
-                forcefield.bonded.bonds.potentials.harmonic.Harmonic.get_units()
+    def _get_bonds(self, bonds):
+        ff = bonds.ff
+        bonds_units = forcefield.bonded.bonds.potentials.harmonic.Harmonic.get_units()
+        bonds_units.update(forcefield.bonded.Bonds.get_units())
+
+        bonds_lengths = bonds.length
+        bonds_k = bonds.k
+        ntypes = len(bonds_k)
+
+        connectivity = [
+            (
+                ff._atomTypes[next(iter(bonds.types1[i]))].atomClass,
+                ff._atomTypes[next(iter(bonds.types2[i]))].atomClass,
+                1,
             )
-            bonds_units.update(forcefield.bonded.Bonds.get_units())
+            for i in range(ntypes)
+        ]
 
-            bond_req_factor = convert(
-                1.0, bond.type.ureq.unit.get_name(), bonds_units["lengths_units"]
-            )
-            bond_k_factor = convert(
-                1.0, bond.type.uk.unit.get_name(), bonds_units["spring_units"]
-            )
-            bonds_lengths = [bond.type.req * bond_req_factor for bond in ff.bonds]
+        params = forcefield.bonded.bonds.potentials.Harmonic(
+            spring=bonds_k,
+            spring_units=f"{openmm_units['energy']} / {openmm_units['length']}**2",
+        )
 
-            bonds_type = [bond.funct for bond in ff.bonds]
-            bonds_k = [bond.type.k * bond_k_factor for bond in ff.bonds]
-            connectivity = [
-                (bond.atom1.idx, bond.atom2.idx, bond.order or 1) for bond in ff.bonds
-            ]
+        return forcefield.bonded.Bonds(
+            params=params,
+            lengths=bonds_lengths,
+            lengths_units=openmm_units["length"],
+            connectivity=connectivity,
+            form="Harmonic",
+        )
 
-            unique_bonds_type = set(bonds_type)
-
-            if len(unique_bonds_type) > 1:
-                raise NotImplementedError("Multiple bond types not yet supported.")
-                # params = [
-                #    bond_types.get(btype)(spring=bonds_k[bonds_type == btype])
-                #    for btype in unique_bonds_type
-                #    if bond_types.get(btype)
-                # ]
-            else:
-                bond_funct = unique_bonds_type.pop()
-                assert (
-                    bond_funct == 1
-                ), "Only Harmonic bond potentials supported in mmic_openmm."
-                params = bond_types.get(bond_funct)(spring=bonds_k)
-
-            bonds = forcefield.bonded.Bonds(
-                params=params,
-                lengths=bonds_lengths,
-                indices=connectivity,
-                form="Harmonic",
-            )
-        else:
-            bonds = None
-
+    def _get_angle(self, ff):
         if angle:
             angles_units = (
                 forcefield.bonded.angles.potentials.harmonic.Harmonic.get_units()
