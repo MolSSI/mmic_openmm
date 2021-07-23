@@ -8,6 +8,7 @@ dependencies:
   - python
   - pip
   - openmm
+  - cython
 
     # Pip-only installs
   - pip:
