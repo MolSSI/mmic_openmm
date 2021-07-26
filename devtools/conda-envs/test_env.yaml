@@ -4,6 +4,8 @@ channels:
   - anaconda
   - omnia
   - conda-forge
+  - bioconda
+  
 dependencies:
     # Base depends
   - python
@@ -11,6 +13,7 @@ dependencies:
   - openmm
   - cython
   - libgcc-ng
+  - gromacs
 
     # Pip-only installs
   - pip:
