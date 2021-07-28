@@ -305,6 +305,7 @@ class OpenMMToFFComponent(TransComponent):
 
         nonbonded, charges = self._get_nonbonded(nonbond_ff)
         bonds = self._get_bonds(bond_ff)
+        angles = self._get_angles(angle_ff)
 
         # charge_groups = None ... should support charge_groups?
         exclusions = None
@@ -314,7 +315,7 @@ class OpenMMToFFComponent(TransComponent):
             "masses": masses,
             "charges": charges,
             "bonds": bonds,
-            # "angles": angles,
+            "angles": angles,
             # "dihedrals": dihedrals,
             "nonbonded": nonbonded,
             "exclusions": exclusions,
@@ -389,61 +390,36 @@ class OpenMMToFFComponent(TransComponent):
             form="Harmonic",
         )
 
-    def _get_angle(self, ff):
-        if angle:
-            angles_units = (
-                forcefield.bonded.angles.potentials.harmonic.Harmonic.get_units()
+    def _get_angles(self, angles):
+        ff = angles.ff
+        angles_units = forcefield.bonded.angles.potentials.harmonic.Harmonic.get_units()
+        angles_units.update(forcefield.bonded.Angles.get_units())
+
+        angles_lengths = angles.angle
+        angles_k = angles.k
+        ntypes = len(angles_k)
+
+        connectivity = [
+            (
+                ff._atomTypes[next(iter(angles.types1[i]))].atomClass,
+                ff._atomTypes[next(iter(angles.types2[i]))].atomClass,
+                ff._atomTypes[next(iter(angles.types3[i]))].atomClass,
             )
-            angles_units.update(forcefield.bonded.Angles.get_units())
+            for i in range(ntypes)
+        ]
 
-            angle_theta_factor = convert(
-                1.0, angle.type.utheteq.unit.get_name(), angles_units["angles_units"]
-            )
-            angle_k_factor = convert(
-                1.0, angle.type.uk.unit.get_name(), angles_units["spring_units"]
-            )
-            angles_ = [angle.type.theteq * angle_theta_factor for angle in ff.angles]
-            angles_k = [angle.type.k * angle_k_factor for angle in ff.angles]
-            angles_type = [angle.funct for angle in ff.angles]
+        params = forcefield.bonded.bonds.potentials.Harmonic(
+            spring=angles_k,
+            spring_units=f"{openmm_units['energy']} / {openmm_units['angle']}**2",
+        )
 
-            angles_indices = [
-                (angle.atom1.idx, angle.atom2.idx, angle.atom3.idx)
-                for angle in ff.angles
-            ]
-
-            unique_angles_type = set(angles_type)
-            if len(unique_angles_type) > 1:
-                raise NotImplementedError("Multiple angle types not yet supported.")
-                # params = [
-                #    angleTypes.get(btype)(spring=angles_k[angles_type == btype])
-                #    for btype in unique_angles_type
-                #    if angleTypes.get(btype)
-                # ]
-            else:
-                angle_funct = unique_angles_type.pop()
-                assert (
-                    angle_funct == 1
-                ), "Only Harmonic angle potentials supported in mmic_openmm."
-                params = angle_types.get(angle_funct)(spring=angles_k)
-
-            angles = forcefield.bonded.Angles(
-                params=params, angles=angles_, indices=angles_indices, form="Harmonic"
-            )
-        else:
-            angles = None
-
-        if dihedral:
-            dihedrals_funct = set([di.funct for di in ff.dihedrals if di.funct != 4])
-            # funct == 4: periodic improper dihedrals see https://manual.gromacs.org/documentation/2019/reference-manual/topologies/topology-file-formats.html#tab-topfile2
-            dihedrals = [self._get_dihedrals(funct, ff) for funct in dihedrals_funct]
-
-            if len(dihedrals) == 1:  # no point in keeping a list for single-type
-                dihedrals = dihedrals.pop()
-        else:
-            dihedrals = None
-
-        if hasattr(ff, "residues"):
-            residues = [(atom.residue.name, atom.residue.idx) for atom in ff.atoms]
+        return forcefield.bonded.Angles(
+            params=params,
+            angles=angles_lengths,
+            angles_units=openmm_units["angle"],
+            connectivity=connectivity,
+            form="Harmonic",
+        )
 
     def _get_dihedrals(self, funct, ff):
 
