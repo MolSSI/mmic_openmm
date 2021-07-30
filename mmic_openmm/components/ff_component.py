@@ -306,6 +306,7 @@ class OpenMMToFFComponent(TransComponent):
         nonbonded, charges = self._get_nonbonded(nonbond_ff)
         bonds = self._get_bonds(bond_ff)
         angles = self._get_angles(angle_ff)
+        dihedrals = self._get_dihedrals_proper(dihedral_ff)
 
         # charge_groups = None ... should support charge_groups?
         exclusions = None
@@ -316,7 +317,7 @@ class OpenMMToFFComponent(TransComponent):
             "charges": charges,
             "bonds": bonds,
             "angles": angles,
-            # "dihedrals": dihedrals,
+            "dihedrals": dihedrals,
             "nonbonded": nonbonded,
             "exclusions": exclusions,
             "inclusions": inclusions,
@@ -408,7 +409,7 @@ class OpenMMToFFComponent(TransComponent):
             for i in range(ntypes)
         ]
 
-        params = forcefield.bonded.bonds.potentials.Harmonic(
+        params = forcefield.bonded.angles.potentials.Harmonic(
             spring=angles_k,
             spring_units=f"{openmm_units['energy']} / {openmm_units['angle']}**2",
         )
@@ -421,73 +422,39 @@ class OpenMMToFFComponent(TransComponent):
             form="Harmonic",
         )
 
-    def _get_dihedrals(self, funct, ff):
-
-        assert dihedral_types.get(
-            funct
-        ), f"Functional form {funct} not supported in mmic_openmm"
-
-        dihedrals_units = dihedral_types[funct].get_units()  # model param units
-        dihedrals_units.update(
-            forcefield.bonded.Dihedrals.get_units()
-        )  # global param units
-
-        dihedral_phi_factor = convert(
-            1.0,
-            "kcal/mol",  # dihedrals_type.uphi_k.unit.get_name(),
-            dihedrals_units["energy_units"],
+    def _get_dihedrals_proper(self, dihedrals):
+        ff = dihedrals.ff
+        proper = dihedrals.proper
+        dihedrals_units = (
+            forcefield.bonded.dihedrals.potentials.harmonic.Harmonic.get_units()
         )
-        dihedral_phase_factor = convert(
-            1.0,
-            "degrees",  # dihedrals_type.uphase.unit.get_name(),
-            dihedrals_units["phase_units"],
-        )
-        dihedrals_indices = [
+        dihedrals_units.update(forcefield.bonded.Dihedrals.get_units())
+
+        connectivity = [
             (
-                dihedral.atom1.idx,
-                dihedral.atom2.idx,
-                dihedral.atom3.idx,
-                dihedral.atom4.idx,
+                ff._atomTypes[next(iter(dihedral.types1))].atomClass,
+                ff._atomTypes[next(iter(dihedral.types2))].atomClass,
+                ff._atomTypes[next(iter(dihedral.types3))].atomClass,
+                ff._atomTypes[next(iter(dihedral.types4))].atomClass,
             )
-            for dihedral in ff.dihedrals
+            for dihedral in proper
         ]
 
-        # Need to look into per, scee, and scnb ... their meaning, units, etc.
-        if funct == 9:  # multi-dihedrals ... special case
-            phase, energy, per = [], [], []
-            for dihedral in ff.dihedrals:
-                if dihedral.funct == funct:
-                    phase.append(
-                        [item.phase * dihedral_phase_factor for item in dihedral.type]
-                    )
-                    energy.append(
-                        [item.phi_k * dihedral_phi_factor for item in dihedral.type]
-                    )
-                    per.append([item.per for item in dihedral.type])
-        else:
-            dihedrals_params = [
-                [
-                    (
-                        dihedral.type.phase * dihedral_phase_factor,
-                        dihedral.type.phi_k * dihedral_phi_factor,
-                        dihedral.type.per,
-                        dihedral.type.scee,
-                        dihedral.type.scnb,
-                    )
-                ]
-                for dihedral in ff.dihedrals
-                if dihedral.funct == funct
-            ]
-            phase, energy, per, _, _ = zip(*dihedrals_params)
+        fields = [
+            (dihedral.k, dihedral.periodicity, dihedral.phase) for dihedral in proper
+        ]
+        energy, periodicity, phase = zip(*fields)
 
-        params = dihedral_types.get(funct)(
-            phase=phase,
+        params = forcefield.bonded.dihedrals.potentials.CharmmMulti(
             energy=energy,
-            periodicity=per,
+            energy_units=openmm_units["energy"],
+            periodicity=periodicity,
+            phase=phase,
+            phase_units=openmm_units["angle"],
         )
 
         return forcefield.bonded.Dihedrals(
             params=params,
-            indices=dihedrals_indices,
-            form=dihedral_types.get(funct).__name__,
+            connectivity=connectivity,
+            form="CharmmMulti",
         )
