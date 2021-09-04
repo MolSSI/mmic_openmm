@@ -18,11 +18,11 @@ dependencies:
     # Pip-only installs
   - pip:
     - mmic>=0.1.0
-    - cmselemental>=0.1.0
     - codecov
     - pytest
     - pytest-cov
     - qcelemental
+    - git+https://github.com/MolSSI/cmselemental.git@v0.2.0
     - git+https://github.com/parmed/parmed.git
     - git+https://github.com/MolSSI/mmelemental.git
     - git+https://github.com/MolSSI/mmic_translator.git
