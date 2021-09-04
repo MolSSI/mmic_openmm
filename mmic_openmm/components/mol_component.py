@@ -1,4 +1,4 @@
-from mmelemental.models.molecule import Molecule
+from mmelemental.models import Molecule
 from typing import List, Tuple, Optional
 from mmelemental.util.units import convert
 from mmic_translator import (
@@ -62,25 +62,17 @@ class MolToOpenMMComponent(TransComponent):
                 "mmic_openmm is supported only for atomic/molecular systems. Molecule.atomic_numbers must be defined."
             )
 
-        if mmol.extras.get("chains"):
-            chains = [top.addChain() for i in range(len(mmol.chains))]
-        else:
-            chains = [top.addChain()]
+        chains = [top.addChain()]
 
-        if mmol.substructs:
-            residues = list(_fast_set(mmol.substructs))
-            nres = len(residues)
-            resnames, _ = zip(*residues)
-            _, resids = zip(*mmol.substructs)
-            resids = [i for i in resids]
-        else:
-            nres = 1
-            resnames, resids = "UNK", [0]
+        if isinstance(mmol.extras, dict):
+            if mmol.extras.get("chains"):
+                chains = [top.addChain() for i in range(len(mmol.chains))]
 
-        residues = [
-            top.addResidue(resname, chain=chains[0], id=resid)
-            for resname, resid in residues
-        ]
+        if mmol.substructs is not None:
+            residues = [
+                top.addResidue(resname, chain=chains[0], id=resid)
+                for resname, resid in mmol.get_substructs()
+            ]
         atoms = [None] * natoms
 
         for index, symb in enumerate(mmol.symbols):
@@ -101,7 +93,7 @@ class MolToOpenMMComponent(TransComponent):
         if mmol.geometry is not None:
             coordinates = mmol.geometry.reshape(natoms, ndim)
 
-        if mmol.connectivity:
+        if mmol.connectivity is not None:
             for (
                 i,
                 j,
@@ -190,10 +182,3 @@ class OpenMMToMolComponent(TransComponent):
             schema_version=inputs.schema_version,
             schema_name=inputs.schema_name,
         )
-
-
-def _fast_set(seq: List) -> List:
-    """Removes duplicate entries in a list while preserving the order."""
-    seen = set()
-    seen_add = seen.add
-    return [x for x in seq if not (x in seen or seen_add(x))]
