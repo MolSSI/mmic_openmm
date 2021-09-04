@@ -1,7 +1,7 @@
 from typing import Dict, Any, Optional
 from mmic_translator.models.base import ToolkitModel
 from mmelemental.models import Molecule
-from mmelemental.types import Array
+from cmselemental.types import Array
 import numpy
 from pydantic import Field
 from pathlib import Path

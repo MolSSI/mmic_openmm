@@ -57,7 +57,7 @@ def test_mmic_to_mol_from_gro(**kwargs):
 
 
 def test_mol_to_openmm(**kwargs):
-    mmol = mm.models.molecule.mm_mol.Molecule.from_file(grofile, topfile)
+    mmol = mm.models.Molecule.from_file(grofile, topfile)
     inputs = {
         "schema_object": mmol,
         "schema_version": 1,
