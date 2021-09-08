@@ -36,7 +36,9 @@ class OpenMMUnit(Unit):
 
 
 class OpenMMMol(ToolkitModel):
-    """A model for OpenMM molecule class storing a Topology object."""
+    """A model for OpenMM molecule class storing a Topology object. Since Topology objects in OpenMM
+    do not store particle positions, we store in this model instead.
+    """
 
     positions: Array[float] = Field(
         ...,
@@ -97,7 +99,7 @@ class OpenMMMol(ToolkitModel):
                 gro = app.GromacsTopFile(
                     top_filename,
                     periodicBoxVectors=fileobj.getPeriodicBoxVectors(),
-                    includeDir="/usr/share/gromacs/top",
+                    includeDir="/usr/share/gromacs/top",  # need to automate this
                 )
                 top = gro.topology
         elif ext == ".inpcrd":
@@ -106,7 +108,7 @@ class OpenMMMol(ToolkitModel):
                 top = app.AmberPrmtopFile(top_filename)
         else:
             raise NotImplementedError(
-                "Only PDB (.pdb), GROMACS (.gro), and AMBER (.inpcrd) coords files supported by mmic_pdb."
+                "Only PDB (.pdb), GROMACS (.gro), and AMBER (.inpcrd) coords files supported by mmic_openmm."
             )
 
         if top is None:
@@ -186,12 +188,12 @@ class OpenMMMol(ToolkitModel):
 
         writeFile(self.data, positions, open(filename, mode=mode), **kwargs)
 
-    def to_schema(self, version: Optional[int] = 0, **kwargs) -> Molecule:
+    def to_schema(self, version: Optional[int] = 1, **kwargs) -> Molecule:
         """Converts the molecule to MMSchema molecule.
         Parameters
         ----------
         version: str, optional
-            Schema specification version to comply with e.g. 1.0.1.
+            Schema specification version to comply with.
         **kwargs
             Additional kwargs to pass to the constructor.
         """
