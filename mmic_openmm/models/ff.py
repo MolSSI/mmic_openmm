@@ -7,12 +7,10 @@ from mmic_openmm.components.ff_component import FFToOpenMMComponent
 from mmic_openmm.components.ff_component import OpenMMToFFComponent
 
 # OpenMM library
-from simtk.unit.quantity import Quantity
-from simtk.unit.unit import Unit, BaseUnit, BaseDimension
-from simtk.openmm.vec3 import Vec3
-from simtk.openmm import app
-from simtk.openmm import __version__ as openmm_version
-from simtk.openmm.app import ForceField as OpenMMForceField
+from openmm.unit import Unit, BaseUnit, BaseDimension, Quantity
+from openmm.vec3 import Vec3
+from openmm import app
+from openmm import __version__ as openmm_version
 
 __all__ = ["OpenMMFF"]
 
@@ -27,7 +25,7 @@ class OpenMMFF(ToolkitModel):
     @classmethod
     def dtype(cls):
         """Returns the fundamental molecule object type."""
-        return OpenMMForceField
+        return app.ForceField
 
     @classmethod
     def isvalid(cls, data):
@@ -54,9 +52,9 @@ class OpenMMFF(ToolkitModel):
             A constructed OpenMMFF object.
         """
         if isinstance(filename, str):
-            ff = OpenMMForceField(filename, **kwargs)
+            ff = app.ForceField(filename, **kwargs)
         else:
-            ff = OpenMMForceField(*filename, **kwargs)
+            ff = app.ForceField(*filename, **kwargs)
 
         return cls(data=ff)
 

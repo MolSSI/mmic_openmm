@@ -11,11 +11,10 @@ from mmic_openmm.components.mol_component import OpenMMToMolComponent
 from mmic_openmm.components.mol_component import MolToOpenMMComponent
 
 # OpenMM library
-from simtk.unit.quantity import Quantity
-from simtk.unit.unit import Unit, BaseUnit, BaseDimension
-from simtk.openmm.vec3 import Vec3
-from simtk.openmm import app
-from simtk.openmm import __version__ as openmm_version
+from openmm.unit import Quantity, Unit, BaseUnit, BaseDimension
+from openmm.vec3 import Vec3
+from openmm import app
+from openmm import __version__ as openmm_version
 
 __all__ = ["OpenMMMol"]
 
